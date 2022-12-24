@@ -95,7 +95,7 @@ async function moveExistingCard(octokit, columnId, cardId){
         position: "top",
         column_id: columnId
     });
-    return `Succesfully moved card #${cardId} to column #${columnId} !`;
+    return `Successfully moved card #${cardId} to column #${columnId} !`;
 }
 
 async function tryGetColumnAndCardInformation(columnName, projectUrl, token, issueOrPrDatabaseId){
@@ -114,7 +114,7 @@ async function tryGetColumnAndCardInformation(columnName, projectUrl, token, iss
         console.log(`This project is configured at the org level. Org Login:${orgLogin}, project number#${projectNumber}`);
         var orgInformation = await getOrgInformation(orgLogin, projectNumber, token);
         console.log(orgInformation);
-        orgInformation.organization.project?.columns.nodes.forEach(function(columnNode){
+        orgInformation.organization.project.columns.nodes.forEach(function(columnNode){
             var name = columnNode.name;
             if(name == columnName){
                 columnId = columnNode.databaseId;
