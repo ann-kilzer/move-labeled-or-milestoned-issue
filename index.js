@@ -113,7 +113,8 @@ async function tryGetColumnAndCardInformation(columnName, projectUrl, token, iss
         var orgLogin = splitUrl[4];
         console.log(`This project is configured at the org level. Org Login:${orgLogin}, project number#${projectNumber}`);
         var orgInformation = await getOrgInformation(orgLogin, projectNumber, token);
-        orgInformation.organization.project.columns.nodes.forEach(function(columnNode){
+        console.log(orgInformation);
+        orgInformation.organization.project?.columns.nodes.forEach(function(columnNode){
             var name = columnNode.name;
             if(name == columnName){
                 columnId = columnNode.databaseId;
