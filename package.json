@@ -11,7 +11,7 @@
     "type": "git",
     "url": "git+https://github.com/konradpabjan/actions-move-labeled-issue.git"
   },
-  "author": "konradpabjan",
+  "author": "ann-kilzer",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/konradpabjan/actions-move-labeled-issue/issues"

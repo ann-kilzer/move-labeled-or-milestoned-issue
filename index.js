@@ -1,6 +1,6 @@
 const github = require("@actions/github");
 const core = require("@actions/core");
-const graphql = require("@octokit/graphql");
+const { graphql } = require("@octokit/graphql");
 
 async function run() {
     const myToken = core.getInput("action-token");
@@ -60,7 +60,7 @@ async function getProjectV2ID(projectUrl, token) {
         );
         var projectInfo = await getProjectV2Info(orgLogin, projectNumber, token);
         console.log(projectInfo);
-        return projectInfo.databaseId;
+        return projectInfo.organization.projectV2.databaseId;
     }
     return null;
 }
