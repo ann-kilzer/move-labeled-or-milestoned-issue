@@ -12,10 +12,9 @@ async function run() {
     const octokit = new github.GitHub(myToken);
     const context = github.context;
 
-    if(!milestoneName && !labelName){
+    if (!milestoneName && !labelName) {
         throw new Error("one of label-name and milestone-name must be set");
-    }
-    else if (milestoneName && labelName){
+    } else if (milestoneName && labelName) {
         throw new Error("label-name and milestone-name cannot both be set");
     }
 
@@ -31,74 +30,105 @@ async function run() {
         objectType = "PullRequest";
     }
 
-    if(baseObject && labelName){
-        baseObject.labels.forEach(function(item){
-            if(labelName == item.name){
+    if (baseObject && labelName) {
+        baseObject.labels.forEach(function(item) {
+            if (labelName == item.name) {
                 found = true;
             }
         });
     }
 
-    if(baseObject && milestoneName){
-        if(baseObject.milestone && baseObject.milestone.title == milestoneName){
+    if (baseObject && milestoneName) {
+        if (baseObject.milestone && baseObject.milestone.title == milestoneName) {
             found = true;
         }
     }
 
-    if(found){
-        // get the columnId for the project where the issue should be added/moved
-        var info = await tryGetColumnAndCardInformation(columnName, projectUrl, myToken, baseObject.id);
+    if (found) {
+    // get the columnId for the project where the issue should be added/moved
+        var info = await tryGetColumnAndCardInformation(
+            columnName,
+            projectUrl,
+            myToken,
+            baseObject.id
+        );
         var columnId = info[0];
         var cardId = info[1];
         var currentColumn = info[2];
-        console.log(`columnId is: ${columnId}, cardId is: ${cardId}, currentColumn is: ${currentColumn}`);
-
-        var skip = [];
-        // Check optionally specified ignoreList
-        if (ignoreList){
-            skip = ignoreList.split(",");
-        }
-        
-        if (cardId != null && (ignoreList == "*" || skip.includes(currentColumn))){
-            // card is present in a column that we want to ignore, don't move or do anything
-            return `Card exists for issue in column ${currentColumn}. Column specified to be ignored, not moving issue.`;
-        }
-        else if (cardId != null){
-            // card already exists for the issue
-            // move card to the appropriate column
-            return await moveExistingCard(octokit, columnId, cardId);
+        var projectV2ID = info[3];
+        if (projectV2ID) {
+            handleV2Card(baseObject, projectV2ID, myToken);
         } else {
-            // card is not present
-            // create new card in the appropriate column
-            return await createNewCard(octokit, columnId, baseObject.id, objectType);
+            handleV1Card(octokit, baseObject, columnId, cardId, currentColumn, ignoreList, objectType);
         }
+
     } else {
-        // None of the labels match what we are looking for, non-indicative of a failure though
+    // None of the labels match what we are looking for, non-indicative of a failure though
         return `Issue/PR #${baseObject.id} does not have a label that matches ${labelName}, ignoring`;
     }
 }
 
-async function createNewCard(octokit, columnId, issueOrPrId, objectType){
-    console.log(`No card exists for the labeled ${objectType} in the project. Attempting to create a card in column ${columnId}, for the ${objectType} with the corresponding id #${issueOrPrId}`);
+async function handleV2Card(baseObject, projectID, token){
+    const result = moveItemToV2Project(projectID, baseObject.id, token);
+    console.log(result);
+
+}
+
+async function handleV1Card(octokit, baseObject, columnId, cardId, currentColumn, ignoreList, objectType) {
+    console.log(
+        `columnId is: ${columnId}, cardId is: ${cardId}, currentColumn is: ${currentColumn}`
+    );
+
+    var skip = [];
+    // Check optionally specified ignoreList
+    if (ignoreList) {
+        skip = ignoreList.split(",");
+    }
+
+    if (cardId != null && (ignoreList == "*" || skip.includes(currentColumn))) {
+        // card is present in a column that we want to ignore, don't move or do anything
+        return `Card exists for issue in column ${currentColumn}. Column specified to be ignored, not moving issue.`;
+    } else if (cardId != null) {
+        // card already exists for the issue
+        // move card to the appropriate column
+        return await moveExistingCard(octokit, columnId, cardId);
+    } else {
+        // card is not present
+        // create new card in the appropriate column
+        return await createNewCard(octokit, columnId, baseObject.id, objectType);
+    }
+}
+
+async function createNewCard(octokit, columnId, issueOrPrId, objectType) {
+    console.log(
+        `No card exists for the labeled ${objectType} in the project. Attempting to create a card in column ${columnId}, for the ${objectType} with the corresponding id #${issueOrPrId}`
+    );
     await octokit.projects.createCard({
         column_id: columnId,
         content_id: issueOrPrId,
-        content_type: objectType
+        content_type: objectType,
     });
     return `Successfully created a new card in column #${columnId} for the ${objectType} with the corresponding id:${issueOrPrId} !`;
 }
 
-async function moveExistingCard(octokit, columnId, cardId){
-    console.log(`A card already exists for the issue. Attempting to move card #${cardId} to column #${columnId}`);
+async function moveExistingCard(octokit, columnId, cardId) {
+    console.log(
+        `A card already exists for the issue. Attempting to move card #${cardId} to column #${columnId}`
+    );
     await octokit.projects.moveCard({
         card_id: cardId,
         position: "top",
-        column_id: columnId
+        column_id: columnId,
     });
     return `Successfully moved card #${cardId} to column #${columnId} !`;
 }
 
-async function tryGetColumnAndCardInformation(columnName, projectUrl, token, issueOrPrDatabaseId){
+async function tryGetColumnAndCardInformation(
+    columnName,
+    projectUrl,
+    token,
+    issueOrPrDatabaseId
+) {
     // if org project, we need to extract the org name
     // if repo project, need repo owner and name
     var columnId = null;
@@ -106,48 +136,48 @@ async function tryGetColumnAndCardInformation(columnName, projectUrl, token, iss
     var currentColumnName = null;
     var splitUrl = projectUrl.split("/");
     var projectNumber = parseInt(splitUrl[6], 10);
+    let projectV2ID = null;
 
     // check if repo or org project
-    if(splitUrl[3] == "orgs"){
-        // Org url will be in the format: https://github.com/orgs/github/projects/910
+    if (splitUrl[3] == "orgs") {
+    // Org url will be in the format: https://github.com/orgs/github/projects/910
         var orgLogin = splitUrl[4];
-        console.log(`This project is configured at the org level. Org Login:${orgLogin}, project number#${projectNumber}`);
-        var orgInformation = await getOrgInformation(orgLogin, projectNumber, token);
-        console.log(orgInformation);
-        orgInformation.organization.project.columns.nodes.forEach(function(columnNode){
-            var name = columnNode.name;
-            if(name == columnName){
-                columnId = columnNode.databaseId;
-            }
-            // check each column if there is a card that exists for the issue
-            columnNode.cards.edges.forEach(function(card){
-                // card level
-                if (card.node.content != null){
-                    // only issues and pull requests have content
-                    if(card.node.content.databaseId == issueOrPrDatabaseId){
-                        cardId = card.node.databaseId;
-                        currentColumnName = columnNode.name;
-                    }
-                }
-            });
-        });
+        console.log(
+            `This project is configured at the org level. Org Login:${orgLogin}, project number#${projectNumber}`
+        );
+        var projectInfo = await getProjectV2Info(
+            orgLogin,
+            projectNumber,
+            token
+        );
+        console.log(projectInfo);
+        projectV2ID = projectInfo.databaseId;
     } else {
         // Repo url will be in the format: https://github.com/bbq-beets/konradpabjan-test/projects/1
         var repoOwner = splitUrl[3];
         var repoName = splitUrl[4];
-        console.log(`This project is configured at the repo level. Repo Owner:${repoOwner}, repo name:${repoName} project number#${projectNumber}`);
-        var repoColumnInfo = await getRepoInformation(repoOwner, repoName, projectNumber, token);
-        repoColumnInfo.repository.project.columns.nodes.forEach(function(columnNode){
+        console.log(
+            `This project is configured at the repo level. Repo Owner:${repoOwner}, repo name:${repoName} project number#${projectNumber}`
+        );
+        var repoColumnInfo = await getRepoInformation(
+            repoOwner,
+            repoName,
+            projectNumber,
+            token
+        );
+        repoColumnInfo.repository.project.columns.nodes.forEach(function(
+            columnNode
+        ) {
             var name = columnNode.name;
-            if(name == columnName){
+            if (name == columnName) {
                 columnId = columnNode.databaseId;
             }
             // check each column if there is a card that exists for the issue
-            columnNode.cards.edges.forEach(function(card){
+            columnNode.cards.edges.forEach(function(card) {
                 // card level
-                if (card.node.content != null){
+                if (card.node.content != null) {
                     // only issues and pull requests have content
-                    if(card.node.content.databaseId == issueOrPrDatabaseId){
+                    if (card.node.content.databaseId == issueOrPrDatabaseId) {
                         cardId = card.node.databaseId;
                         currentColumnName = columnNode.name;
                     }
@@ -155,108 +185,123 @@ async function tryGetColumnAndCardInformation(columnName, projectUrl, token, iss
             });
         });
     }
-    return [columnId, cardId, currentColumnName];
+    return [columnId, cardId, currentColumnName, projectV2ID];
 }
 
-async function getOrgInformation(organizationLogin, projectNumber, token){
-    // GraphQL query to get all of the cards in each column for a project
-    // https://developer.github.com/v4/explorer/ is good to play around with
+async function getProjectV2Info(organizationLogin, projectNumber, token) {
+    // GraphQL query to get the ID and title for a projectV2
+    // https://docs.github.com/en/graphql/overview/explorer is good to play around with
     const response = await graphql(
-        `query ($loginVariable: String!, $projectVariable: Int!){
-            organization(login:$loginVariable) {
-                name
-                project(number:$projectVariable) {
-                    databaseId
-                    name
-                    url
-                    columns(first:100){
-                        nodes{
-                            databaseId
-                            name
-                            cards {
-                                edges {
-                                    node {
-                                        databaseId
-                                            content {
-                                                ... on Issue {
-                                                    databaseId
-                                                    number
-                                                }
-                                                ... on PullRequest {
-                                                    databaseId
-                                                    number
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }`,{
+        `query($loginVariable: String!, $projectVariable: Int!) {
+        organization(login: $loginVariable) {
+          projectV2(number: $projectVariable) {
+            databaseId
+            title
+            }
+          }
+        }
+      }
+    `,
+        {
             loginVariable: organizationLogin,
             projectVariable: projectNumber,
             headers: {
-                authorization: `bearer ${token}`
-            }
-        });
+                authorization: `bearer ${token}`,
+            },
+        }
+    );
     return response;
 }
 
-async function getRepoInformation(repositoryOwner, repositoryName, projectNumber, token){
+async function getRepoInformation(
+    repositoryOwner,
+    repositoryName,
+    projectNumber,
+    token
+) {
     // GraphQL query to get all of the columns in a project that is setup at that org level
     // https://developer.github.com/v4/explorer/ is good to play around with
     const response = await graphql(
-        `query ($ownerVariable: String!, $nameVariable: String!, $projectVariable: Int!){
-            repository(owner:$ownerVariable, name:$nameVariable) {
-                project(number:$projectVariable){
-                    id
-                    number
-                    databaseId
-                    name
-                    url
-                    columns(first:100){
-                        nodes{
-                            databaseId
-                            name
-                            cards {
-                                edges {
-                                    node {
-                                        databaseId
-                                            content {
-                                                ... on Issue {
-                                                    databaseId
-                                                    number
-                                                }
-                                                ... on PullRequest {
-                                                    databaseId
-                                                    number
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+        `
+      query(
+        $ownerVariable: String!
+        $nameVariable: String!
+        $projectVariable: Int!
+      ) {
+        repository(owner: $ownerVariable, name: $nameVariable) {
+          project(number: $projectVariable) {
+            id
+            number
+            databaseId
+            name
+            url
+            columns(first: 100) {
+              nodes {
+                databaseId
+                name
+                cards {
+                  edges {
+                    node {
+                      databaseId
+                      content {
+                        ... on Issue {
+                          databaseId
+                          number
                         }
+                        ... on PullRequest {
+                          databaseId
+                          number
+                        }
+                      }
                     }
-                }        
-            }`, {
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+        {
             ownerVariable: repositoryOwner,
             nameVariable: repositoryName,
             projectVariable: projectNumber,
             headers: {
-                authorization: `bearer ${token}`
-            }
-        });
+                authorization: `bearer ${token}`,
+            },
+        }
+    );
     return response;
 }
 
-run()
-    .then(
-        (response) => { console.log(`Finished running: ${response}`); },
-        (error) => { 
-            console.log(`#ERROR# ${error}`);
-            process.exit(1); 
+async function moveItemToV2Project(    
+    projectID,
+    itemID,
+    token) {
+    const response = await graphql(
+        `mutation AddToProject($projectID: ID!, $itemId: ID!) {
+            addProjectV2ItemById(input: {projectId: $projectID, contentId: $itemId}) {
+              clientMutationId
+            }
+          }
+    `,
+        {
+            projectID: projectID,
+            itemID: itemID,
+            headers: {
+                authorization: `bearer ${token}`,
+            },
         }
     );
+    return response;
+}
+
+run().then(
+    (response) => {
+        console.log(`Finished running: ${response}`);
+    },
+    (error) => {
+        console.log(`#ERROR# ${error}`);
+        process.exit(1);
+    }
+);
