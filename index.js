@@ -69,12 +69,12 @@ async function getProjectV2Info(organizationLogin, projectNumber, token) {
     // GraphQL query to get the ID and title for a projectV2
     // https://docs.github.com/en/graphql/overview/explorer is good to play around with
     const response = await graphql(
-        `query($loginVariable: String!, $projectVariable: Int!) {
+        `
+      query($loginVariable: String!, $projectVariable: Int!) {
         organization(login: $loginVariable) {
           projectV2(number: $projectVariable) {
             databaseId
             title
-            }
           }
         }
       }
@@ -92,7 +92,8 @@ async function getProjectV2Info(organizationLogin, projectNumber, token) {
 
 async function moveItemToV2Project(projectID, itemID, token) {
     const response = await graphql(
-        `mutation AddToProject($projectID: ID!, $itemId: ID!) {
+        `
+      mutation AddToProject($projectID: ID!, $itemId: ID!) {
         addProjectV2ItemById(
           input: { projectId: $projectID, contentId: $itemId }
         ) {
