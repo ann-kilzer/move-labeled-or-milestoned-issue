@@ -43,7 +43,7 @@ async function run() {
 
 async function handleV2Card(baseObject, projectID, token) {
     console.log(baseObject);
-    const result = moveItemToV2Project(projectID, baseObject.id, token);
+    const result = moveItemToV2Project(projectID, baseObject.node_id, token);
     console.log(result);
 }
 async function getProjectV2ID(projectUrl, token) {
