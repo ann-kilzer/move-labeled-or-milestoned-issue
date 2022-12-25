@@ -47,7 +47,7 @@ async function handleV2Card(baseObject, projectID, token) {
 }
 async function getProjectV2ID(projectUrl, token) {
     // if org project, we need to extract the org name
-    // if repo project, need repo owner and name
+    // if repo project, ???
     var splitUrl = projectUrl.split("/");
     var projectNumber = parseInt(splitUrl[6], 10);
 
@@ -62,6 +62,7 @@ async function getProjectV2ID(projectUrl, token) {
         console.log(projectInfo);
         return projectInfo.databaseId;
     }
+    return null;
 }
 
 async function getProjectV2Info(organizationLogin, projectNumber, token) {
@@ -91,8 +92,7 @@ async function getProjectV2Info(organizationLogin, projectNumber, token) {
 
 async function moveItemToV2Project(projectID, itemID, token) {
     const response = await graphql(
-        `
-      mutation AddToProject($projectID: ID!, $itemId: ID!) {
+        `mutation AddToProject($projectID: ID!, $itemId: ID!) {
         addProjectV2ItemById(
           input: { projectId: $projectID, contentId: $itemId }
         ) {
